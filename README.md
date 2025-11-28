@@ -35,30 +35,45 @@ A universal speech-to-text application with speaker diarization and translation 
 
 ### Prerequisites
 
-- **Backend**: Python 3.10+, ffmpeg
+- **Backend**: Python 3.10+, ffmpeg, uv (Python package manager)
 - **Frontend**: Node.js 18+, Rust 1.70+
+
+### Installing uv
+
+```bash
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or with pip
+pip install uv
+```
 
 ### Backend Setup
 
 ```bash
 cd backend
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Install dependencies with uv (automatically creates venv)
+uv sync
 
-# Install dependencies
-pip install -r requirements.txt
+# Or install with optional features
+uv sync --extra dev                    # Include development tools
+uv sync --extra diarization           # Include speaker diarization
+uv sync --extra translation           # Include translation support
+uv sync --all-extras                  # Include everything
 
 # Configure environment
 cp .env.example .env
 # Edit .env if needed
 
 # Initialize database
-python scripts/setup_db.py
+uv run python scripts/setup_db.py
 
 # Start server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The backend API will be available at http://localhost:8000
@@ -139,17 +154,17 @@ speech-processing-app/
 cd backend
 
 # Run tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Code formatting
-black app/
-isort app/
+uv run black app/
+uv run isort app/
 
 # Type checking
-mypy app/
+uv run mypy app/
 
 # Run development server with auto-reload
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
 ```
 
 ### Frontend Development
@@ -174,15 +189,18 @@ npm run tauri:build
 
 ### Backend
 
-The backend can be run directly with Python or containerized with Docker:
+The backend can be run directly with uv or containerized with Docker:
 
 ```bash
 cd backend
 
-# Option 1: Direct execution
-python -m app.main
+# Option 1: Direct execution with uv
+uv run python -m app.main
 
-# Option 2: Docker
+# Option 2: Production server
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+
+# Option 3: Docker
 docker build -t speech-processing-backend .
 docker run -p 8000:8000 speech-processing-backend
 ```
@@ -265,10 +283,13 @@ sudo apt-get install ffmpeg
 
 ### Backend
 - **FastAPI**: Modern async web framework
-- **faster-whisper**: Optimized Whisper implementation using CTranslate2
+- **faster-whisper**: Optimized Whisper implementation using CTranslate2 (~4x faster than original)
+- **uv**: Fast Python package and project manager (replaces pip/pip-tools/virtualenv)
 - **SQLite**: Database for job tracking
 - **pydub**: Audio format conversion
 - **PyTorch**: ML model inference
+
+**Note on faster-whisper**: We chose faster-whisper over WhisperX for the MVP because it's simpler to set up, has the same accuracy as OpenAI Whisper, uses less memory, and is production-ready. WhisperX can be added later if you need more precise word-level timestamps or integrated diarization.
 
 ### Frontend
 - **Tauri**: Lightweight desktop framework (Rust + WebView)
