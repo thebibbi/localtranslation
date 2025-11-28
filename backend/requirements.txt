@@ -1,0 +1,36 @@
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+websockets==12.0
+
+# ML/AI - Core for MVP
+faster-whisper==1.0.0
+torch==2.1.0
+torchaudio==2.1.0
+
+# Optional ML/AI - for future features
+# pyannote.audio==3.1.0
+# transformers==4.35.0
+
+# Audio Processing
+librosa==0.10.1
+soundfile==0.12.1
+pydub==0.25.1
+
+# Utilities
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+aiofiles==23.2.1
+
+# Storage
+sqlalchemy==2.0.23
+alembic==1.13.0
+
+# Optional - Job Queue
+# redis==5.0.1
+# celery==5.3.4
+
+# Monitoring (optional)
+# prometheus-client==0.19.0
