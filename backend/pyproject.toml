@@ -4,6 +4,55 @@ version = "0.1.0"
 description = "Speech-to-text processing backend with transcription, diarization, and translation"
 requires-python = ">=3.10"
 readme = "README.md"
+dependencies = [
+    # Web Framework
+    "fastapi==0.104.1",
+    "uvicorn[standard]==0.24.0",
+    "python-multipart==0.0.6",
+    "websockets==12.0",
+
+    # ML/AI - Core for MVP
+    "faster-whisper==1.0.0",
+    "torch==2.1.0",
+    "torchaudio==2.1.0",
+
+    # Audio Processing
+    "librosa==0.10.1",
+    "soundfile==0.12.1",
+    "pydub==0.25.1",
+
+    # Utilities
+    "pydantic==2.5.0",
+    "pydantic-settings==2.1.0",
+    "python-dotenv==1.0.0",
+    "aiofiles==23.2.1",
+
+    # Storage
+    "sqlalchemy==2.0.23",
+    "alembic==1.13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest==7.4.3",
+    "pytest-asyncio==0.21.1",
+    "pytest-cov==4.1.0",
+    "httpx==0.25.2",
+
+    # Code Quality
+    "black==23.12.0",
+    "isort==5.13.0",
+    "pylint==3.0.3",
+    "mypy==1.7.1",
+    "flake8==6.1.0",
+]
+diarization = [
+    "pyannote.audio==3.1.0",
+]
+translation = [
+    "transformers==4.35.0",
+]
 
 [tool.black]
 line-length = 100

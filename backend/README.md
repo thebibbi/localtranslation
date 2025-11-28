@@ -13,24 +13,59 @@ Python FastAPI backend for speech-to-text processing with transcription, diariza
 ## Requirements
 
 - Python 3.10+
+- uv (Python package manager)
 - ffmpeg (for audio processing)
 - CUDA/ROCM (optional, for GPU acceleration)
 
 ## Installation
 
-### 1. Create Virtual Environment
+### 1. Install uv
 
 ```bash
-cd backend
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# macOS/Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Or with pip
+pip install uv
 ```
 
 ### 2. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+cd backend
+
+# Install core dependencies (automatically creates venv)
+uv sync
+
+# Or install with optional features
+uv sync --extra dev                    # Development tools (pytest, black, mypy, etc.)
+uv sync --extra diarization           # Speaker diarization (pyannote.audio)
+uv sync --extra translation           # Translation support (transformers, NLLB)
+uv sync --all-extras                  # Install everything
 ```
+
+**Note**: We're using **faster-whisper** (optimized CTranslate2 implementation) which is ~4x faster than the original OpenAI Whisper while maintaining the same accuracy.
+
+#### Why faster-whisper over WhisperX?
+
+**Current Implementation: faster-whisper**
+- ✅ Simpler setup (no additional dependencies)
+- ✅ ~4x faster than original Whisper
+- ✅ Same accuracy as OpenAI Whisper
+- ✅ Lower memory usage
+- ✅ Word-level timestamps supported
+- ✅ Production-ready and stable
+
+**WhisperX Alternative** (not currently implemented)
+- More accurate word-level timestamps
+- Integrated speaker diarization
+- Better alignment for certain languages
+- Requires additional models and more complex setup
+
+**Recommendation**: Start with faster-whisper (current implementation). If you need more precise word-level timestamps or integrated diarization, WhisperX can be added later as an alternative transcription backend.
 
 ### 3. Install ffmpeg
 
@@ -57,20 +92,20 @@ cp .env.example .env
 ### 5. Initialize Database
 
 ```bash
-python scripts/setup_db.py
+uv run python scripts/setup_db.py
 ```
 
 ### 6. Download Whisper Models (Optional)
 
 ```bash
 # Download specific model
-python scripts/download_models.py --models base
+uv run python scripts/download_models.py --models base
 
 # Download multiple models
-python scripts/download_models.py --models tiny base small
+uv run python scripts/download_models.py --models tiny base small
 
 # Download all models
-python scripts/download_models.py --models all
+uv run python scripts/download_models.py --models all
 ```
 
 Models will be downloaded automatically on first use if not pre-downloaded.
@@ -80,13 +115,13 @@ Models will be downloaded automatically on first use if not pre-downloaded.
 ### Start Development Server
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Or using the main module:
 
 ```bash
-python -m app.main
+uv run python -m app.main
 ```
 
 ### API Documentation
