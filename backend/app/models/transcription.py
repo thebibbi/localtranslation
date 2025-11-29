@@ -49,6 +49,8 @@ class TranscriptionSegment(BaseModel):
 class TranscriptionRequest(BaseModel):
     """Request parameters for transcription."""
 
+    model_config = {"protected_namespaces": ()}  # Allow model_size field name
+
     language: Optional[str] = Field(None, description="Source language code (e.g., 'en', 'es')")
     model_size: ModelSize = Field(ModelSize.BASE, description="Whisper model size")
     enable_diarization: bool = Field(False, description="Enable speaker diarization")
@@ -94,6 +96,8 @@ class HealthResponse(BaseModel):
 
 class ModelsResponse(BaseModel):
     """Available models response."""
+
+    model_config = {"protected_namespaces": ()}  # Allow current_model field name
 
     whisper_models: List[str] = Field(..., description="Available Whisper model sizes")
     current_model: str = Field(..., description="Currently loaded model")

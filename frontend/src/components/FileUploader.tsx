@@ -7,6 +7,7 @@ import type { ModelSize } from "@/types/api";
 
 interface FileUploaderProps {
   onFileSelect: (file: File, options: TranscriptionOptions) => void;
+  onFilePathSelect?: (filePath: string, fileName: string, mimeType: string, options: TranscriptionOptions) => void;
   isProcessing: boolean;
 }
 
@@ -29,25 +30,42 @@ const SUPPORTED_FORMATS = [
 ];
 const MAX_FILE_SIZE_MB = 500;
 
+// Store selected file info - either a File object (drag/drop) or path info (Tauri dialog)
+interface SelectedFileInfo {
+  type: "file" | "path";
+  file?: File;
+  path?: string;
+  fileName: string;
+  mimeType: string;
+}
+
 export const FileUploader: React.FC<FileUploaderProps> = ({
   onFileSelect,
+  onFilePathSelect,
   isProcessing,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFileInfo, setSelectedFileInfo] = useState<SelectedFileInfo | null>(null);
   const [modelSize, setModelSize] = useState<ModelSize>("base" as ModelSize);
   const [language, setLanguage] = useState<string>("");
+  const [enableDiarization, setEnableDiarization] = useState(false);
+  const [numSpeakers, setNumSpeakers] = useState<string>("");
   const [error, setError] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const validateFile = (file: File): boolean => {
-    // Check file extension
-    const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
+  const validateFileName = (fileName: string): boolean => {
+    const ext = `.${fileName.split(".").pop()?.toLowerCase()}`;
     if (!SUPPORTED_FORMATS.includes(ext)) {
       setError(`Unsupported format. Supported: ${SUPPORTED_FORMATS.join(", ")}`);
       return false;
     }
+    setError("");
+    return true;
+  };
+
+  const validateFile = (file: File): boolean => {
+    if (!validateFileName(file.name)) return false;
 
     // Check file size
     const sizeMB = file.size / (1024 * 1024);
@@ -62,7 +80,12 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
 
   const handleFileChange = (file: File) => {
     if (validateFile(file)) {
-      setSelectedFile(file);
+      setSelectedFileInfo({
+        type: "file",
+        file,
+        fileName: file.name,
+        mimeType: file.type || "audio/mpeg",
+      });
     }
   };
 
@@ -86,6 +109,20 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
     }
   };
 
+  const getMimeType = (ext: string): string => {
+    const mimeTypes: Record<string, string> = {
+      mp3: "audio/mpeg",
+      wav: "audio/wav",
+      m4a: "audio/mp4",
+      flac: "audio/flac",
+      ogg: "audio/ogg",
+      mp4: "video/mp4",
+      mov: "video/quicktime",
+      avi: "video/x-msvideo",
+    };
+    return mimeTypes[ext] || "audio/mpeg";
+  };
+
   const handleBrowseClick = async () => {
     try {
       const selected = await open({
@@ -99,21 +136,30 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
       });
 
       if (selected && typeof selected === "string") {
-        // Create a File object from the path
-        // Note: This is a simplified version. In production, you'd need to read the file
         const fileName = selected.split("/").pop() || "audio";
-        const file = new File([], fileName);
-        setSelectedFile(file);
-        setError("");
+        const ext = fileName.split(".").pop()?.toLowerCase() || "mp3";
+        const mimeType = getMimeType(ext);
+
+        if (validateFileName(fileName)) {
+          // Store the path - we'll read the file when submitting
+          setSelectedFileInfo({
+            type: "path",
+            path: selected,
+            fileName,
+            mimeType,
+          });
+          setError("");
+        }
       }
     } catch (err) {
+      console.error("File dialog error:", err);
       setError("Failed to open file dialog");
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
+    if (!selectedFileInfo) {
       setError("Please select a file");
       return;
     }
@@ -121,11 +167,20 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
     const options: TranscriptionOptions = {
       modelSize,
       language: language || undefined,
-      enableDiarization: false,
-      numSpeakers: undefined,
+      enableDiarization,
+      numSpeakers: numSpeakers ? parseInt(numSpeakers, 10) : undefined,
     };
 
-    onFileSelect(selectedFile, options);
+    if (selectedFileInfo.type === "file" && selectedFileInfo.file) {
+      // Drag and drop - use File object
+      onFileSelect(selectedFileInfo.file, options);
+    } else if (selectedFileInfo.type === "path" && selectedFileInfo.path && onFilePathSelect) {
+      // Tauri dialog - use path-based upload
+      onFilePathSelect(selectedFileInfo.path, selectedFileInfo.fileName, selectedFileInfo.mimeType, options);
+    } else if (selectedFileInfo.type === "path" && selectedFileInfo.path) {
+      // Fallback: if no path handler, show error
+      setError("Path-based upload not supported. Please use drag and drop.");
+    }
   };
 
   return (
@@ -159,8 +214,8 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
               />
             </svg>
             <div>
-              {selectedFile ? (
-                <p className="text-sm text-gray-700 font-medium">{selectedFile.name}</p>
+              {selectedFileInfo ? (
+                <p className="text-sm text-gray-700 font-medium">{selectedFileInfo.fileName}</p>
               ) : (
                 <>
                   <p className="text-base text-gray-700">
@@ -223,17 +278,69 @@ export const FileUploader: React.FC<FileUploaderProps> = ({
               disabled={isProcessing}
             />
           </div>
+
+          {/* Diarization Options */}
+          <div className="border-t border-gray-200 pt-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">
+                  Speaker Diarization
+                </label>
+                <p className="text-xs text-gray-500">
+                  Identify and label different speakers in the audio
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEnableDiarization(!enableDiarization)}
+                disabled={isProcessing}
+                className={`
+                  relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                  ${enableDiarization ? "bg-blue-600" : "bg-gray-200"}
+                  ${isProcessing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                `}
+              >
+                <span
+                  className={`
+                    inline-block h-4 w-4 transform rounded-full bg-white transition-transform
+                    ${enableDiarization ? "translate-x-6" : "translate-x-1"}
+                  `}
+                />
+              </button>
+            </div>
+
+            {enableDiarization && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Number of Speakers (optional)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={numSpeakers}
+                  onChange={(e) => setNumSpeakers(e.target.value)}
+                  placeholder="Auto-detect if empty"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={isProcessing}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Leave empty to auto-detect the number of speakers
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={!selectedFile || isProcessing}
+          disabled={!selectedFileInfo || isProcessing}
           className={`
             w-full py-3 px-4 rounded-lg font-medium text-white
             transition-colors duration-200
             ${
-              !selectedFile || isProcessing
+              !selectedFileInfo || isProcessing
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-blue-600 hover:bg-blue-700"
             }

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     WHISPER_MODEL_SIZE: str = "base"
     WHISPER_DEVICE: str = "cpu"
     WHISPER_COMPUTE_TYPE: str = "int8"
-    PYANNOTE_HF_TOKEN: str = ""
+    PYANNOTE_AUTH_TOKEN: str = ""  # HuggingFace token for pyannote.audio
 
     # Storage
     UPLOAD_DIR: str = "./storage/uploads"

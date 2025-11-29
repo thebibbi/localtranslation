@@ -33,28 +33,80 @@ A universal speech-to-text application with speaker diarization and translation 
 
 ## Quick Start
 
-### Prerequisites
+### One-Step Setup (Recommended)
 
-- **Backend**: Python 3.10+, ffmpeg, uv (Python package manager)
-- **Frontend**: Node.js 18+, Rust 1.70+
-
-### Installing uv
+The easiest way to get started is using the automated setup script:
 
 ```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Clone the repository (if you haven't already)
+git clone <repository-url>
+cd localtranslation
 
-# Windows
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-
-# Or with pip
-pip install uv
+# Run the setup script
+./scripts/setup.sh
 ```
 
-### Backend Setup
+This script will:
+- Check and install prerequisites (uv, if missing)
+- Set up the backend (Python dependencies, database, directories)
+- Set up the frontend (npm dependencies, icons)
+- Create configuration files from examples
+
+After setup, start both services:
+
+```bash
+# Option 1: Start both services together
+./scripts/start.sh
+
+# Option 2: Start services separately (in different terminals)
+# Terminal 1 - Backend:
+cd backend && uv run uvicorn app.main:app --reload
+
+# Terminal 2 - Frontend:
+cd frontend && npm run tauri:dev
+```
+
+### Prerequisites
+
+Before running the setup script, ensure you have:
+
+- **Python 3.10+**: `python3 --version`
+- **Node.js 18+**: `node --version`
+- **Rust 1.70+**: `rustc --version`
+- **ffmpeg**: `ffmpeg -version`
+
+#### Installing Prerequisites
+
+**macOS (with Homebrew):**
+```bash
+brew install python@3.12 node ffmpeg
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install python3 python3-pip nodejs npm ffmpeg
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+**Windows:**
+- Python: https://www.python.org/downloads/
+- Node.js: https://nodejs.org/
+- Rust: https://rustup.rs/
+- ffmpeg: https://ffmpeg.org/download.html
+
+### Manual Setup
+
+If you prefer manual setup:
+
+#### Backend Setup
 
 ```bash
 cd backend
+
+# Install uv (if not installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install dependencies with uv (automatically creates venv)
 uv sync
@@ -69,6 +121,9 @@ uv sync --all-extras                  # Include everything
 cp .env.example .env
 # Edit .env if needed
 
+# Create storage directories
+mkdir -p storage/uploads storage/processed storage/cache models
+
 # Initialize database
 uv run python scripts/setup_db.py
 
@@ -78,7 +133,7 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 The backend API will be available at http://localhost:8000
 
-### Frontend Setup
+#### Frontend Setup
 
 ```bash
 cd frontend
@@ -271,7 +326,7 @@ sudo apt-get install ffmpeg
 ## Future Enhancements
 
 - [ ] Real-time audio recording and live transcription
-- [ ] Speaker diarization (identify different speakers)
+- [ ] Speaker diarization (identify different speakers) ✅ **Implemented**
 - [ ] Translation between languages
 - [ ] Mobile apps (iOS/Android)
 - [ ] Cloud deployment options
@@ -290,6 +345,33 @@ sudo apt-get install ffmpeg
 - **PyTorch**: ML model inference
 
 **Note on faster-whisper**: We chose faster-whisper over WhisperX for the MVP because it's simpler to set up, has the same accuracy as OpenAI Whisper, uses less memory, and is production-ready. WhisperX can be added later if you need more precise word-level timestamps or integrated diarization.
+
+### Performance Optimization
+
+#### Apple Silicon (M1/M2/M3) Acceleration
+
+The app automatically uses **Metal Performance Shaders (MPS)** on Apple Silicon for GPU acceleration:
+
+```bash
+# Configuration in .env
+WHISPER_DEVICE=mps          # Use Apple Metal GPU
+WHISPER_COMPUTE_TYPE=float16 # Better GPU performance
+```
+
+**Performance benefits:**
+- ~2-3x faster transcription on M1/M2/M3
+- Lower power consumption than CPU
+- Automatic fallback to CPU if MPS unavailable
+
+#### Model Size Performance
+
+| Model | Speed | Accuracy | Memory | Recommended For |
+|-------|-------|----------|--------|------------------|
+| tiny  | ⚡ Fast | Good | ~1GB | Quick drafts, real-time |
+| base  | 🚀 Fast | Better | ~1GB | Daily use (default) |
+| small | 📖 Medium | Good | ~2GB | Better accuracy |
+| medium| 🐢 Slow | Very Good | ~5GB | Professional use |
+| large | 🐢🐢 Slowest | Best | ~10GB | Highest quality |
 
 ### Frontend
 - **Tauri**: Lightweight desktop framework (Rust + WebView)

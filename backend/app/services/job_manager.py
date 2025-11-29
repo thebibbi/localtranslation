@@ -13,6 +13,7 @@ from app.core.logging import get_logger
 from app.models.transcription import JobResponse, JobStatus, TranscriptionRequest
 from app.schemas.job import Base, Job
 from app.services.transcription import get_transcription_service
+from app.services.diarization import get_diarization_service, is_diarization_available
 
 logger = get_logger(__name__)
 
@@ -163,7 +164,7 @@ class JobManager:
         """
         try:
             logger.info(f"Starting transcription job {job_id}")
-            self.update_job_status(job_id, JobStatus.PROCESSING, progress=10)
+            self.update_job_status(job_id, JobStatus.PROCESSING, progress=5)
 
             # Get transcription service
             service = get_transcription_service()
@@ -173,15 +174,59 @@ class JobManager:
                 service.model_size = request.model_size.value
                 service.model = None  # Force reload
 
-            self.update_job_status(job_id, JobStatus.PROCESSING, progress=30)
+            self.update_job_status(job_id, JobStatus.PROCESSING, progress=10)
 
-            # Perform transcription
+            # Define progress callback to update job status
+            def on_progress(progress: int) -> None:
+                self.update_job_status(job_id, JobStatus.PROCESSING, progress=progress)
+
+            # Perform transcription with progress updates
             result = await service.transcribe_file(
                 audio_path=file_path,
                 language=request.language,
+                progress_callback=on_progress,
             )
 
-            self.update_job_status(job_id, JobStatus.PROCESSING, progress=90)
+            # Perform diarization if requested
+            if request.enable_diarization:
+                self.update_job_status(job_id, JobStatus.PROCESSING, progress=92)
+                
+                if is_diarization_available():
+                    try:
+                        logger.info(f"Starting diarization for job {job_id}")
+                        diarization_service = get_diarization_service()
+                        
+                        # Run diarization
+                        speaker_segments = await asyncio.to_thread(
+                            diarization_service.diarize,
+                            file_path,
+                            request.num_speakers,
+                        )
+                        
+                        # Assign speakers to transcription segments
+                        segments_dict = [seg.model_dump() for seg in result.segments]
+                        segments_with_speakers = diarization_service.assign_speakers_to_segments(
+                            segments_dict,
+                            speaker_segments,
+                        )
+                        
+                        # Update result with speaker information
+                        from app.models.transcription import TranscriptionSegment
+                        result.segments = [
+                            TranscriptionSegment(**seg) for seg in segments_with_speakers
+                        ]
+                        
+                        logger.info(f"Diarization completed for job {job_id}")
+                    except Exception as e:
+                        logger.warning(f"Diarization failed for job {job_id}: {str(e)}")
+                        # Continue without diarization - don't fail the whole job
+                else:
+                    logger.warning(
+                        f"Diarization requested but not available for job {job_id}. "
+                        "Install pyannote.audio and set PYANNOTE_AUTH_TOKEN."
+                    )
+
+            self.update_job_status(job_id, JobStatus.PROCESSING, progress=95)
 
             # Save result
             self.save_job_result(job_id, result.model_dump())
@@ -192,12 +237,21 @@ class JobManager:
             logger.info(f"Completed transcription job {job_id}")
 
         except Exception as e:
-            logger.error(f"Transcription job {job_id} failed: {str(e)}")
+            error_msg = str(e)
+            # Provide more helpful error messages
+            if "validation error" in error_msg.lower():
+                error_msg = f"Data validation error during transcription. This may be a bug. Details: {error_msg}"
+            elif "memory" in error_msg.lower():
+                error_msg = "Out of memory. Try using a smaller model size or a shorter audio file."
+            elif "cuda" in error_msg.lower() or "gpu" in error_msg.lower():
+                error_msg = f"GPU error. Falling back to CPU may help. Details: {error_msg}"
+            
+            logger.error(f"Transcription job {job_id} failed: {error_msg}")
             self.update_job_status(
                 job_id,
                 JobStatus.FAILED,
                 progress=0,
-                error=str(e),
+                error=error_msg,
             )
 
         finally:

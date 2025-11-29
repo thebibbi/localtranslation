@@ -2,7 +2,7 @@
  * Transcription Store - State management for transcription operations
  */
 import { create } from "zustand";
-import type { JobResponse, TranscriptionResult } from "@/types/api";
+import type { JobResponse } from "@/types/api";
 
 interface TranscriptionState {
   // Current job

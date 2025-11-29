@@ -14,7 +14,7 @@ tauri-build = { version = "1.5", features = [] }
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-tauri = { version = "1.5", features = ["dialog-all", "fs-all", "http-all", "shell-open"] }
+tauri = { version = "1.5", features = [ "window-close", "window-maximize", "fs-read-dir", "fs-create-dir", "window-unminimize", "window-hide", "window-unmaximize", "fs-read-file", "dialog-save", "fs-write-file", "window-show", "window-minimize", "dialog-open", "http-request", "http-multipart", "window-start-dragging"] }
 
 [features]
 default = ["custom-protocol"]

@@ -1,6 +1,16 @@
 """FastAPI application entry point."""
+import warnings
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+
+# Suppress audio library warnings BEFORE any imports
+warnings.filterwarnings("ignore", message=".*MPEG_LAYER_III subtype.*")
+warnings.filterwarnings("ignore", message=".*torchaudio._backend.set_audio_backend.*")
+warnings.filterwarnings("ignore", category=SyntaxWarning)  # pyannote regex warnings
+
+# Suppress C-level warnings from libmpg123
+os.environ["PYTHONWARNINGS"] = "ignore"
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

@@ -48,29 +48,76 @@ async def transcribe_file(
     Raises:
         FileValidationError: If file validation fails
     """
+    # Log detailed file info for debugging
     logger.info(f"Received transcription request for file: {file.filename}")
-
-    # Validate file size
-    if file.size and not FileHandler.validate_file_size(file.size):
+    logger.info(f"File content_type: {file.content_type}, size: {file.size}")
+    
+    # Read file content to check if it's actually there
+    file_content = await file.read()
+    content_length = len(file_content) if file_content else 0
+    logger.info(f"Actual content length read: {content_length} bytes")
+    
+    # Reset file position for later use
+    await file.seek(0)
+    
+    if content_length == 0:
         raise FileValidationError(
-            f"File too large: {file.size / (1024*1024):.1f}MB "
-            f"(max {settings.MAX_UPLOAD_SIZE}MB)"
+            message="Empty file received",
+            details="The uploaded file contains no data. This may be a browser or network issue.",
+            filename=file.filename,
+            suggestions=[
+                "Try refreshing the page and uploading again",
+                "Check if the file is accessible on your system",
+                "Try a different browser",
+            ],
         )
 
+    # Validate file size before saving
+    if file.size and not FileHandler.validate_file_size(file.size):
+        file_size_mb = file.size / (1024 * 1024)
+        raise FileValidationError(
+            message="File too large",
+            details=f"File size is {file_size_mb:.1f}MB, maximum allowed is {settings.MAX_UPLOAD_SIZE}MB",
+            filename=file.filename,
+            file_size_mb=file_size_mb,
+            suggestions=[
+                "Compress the audio file before uploading",
+                "Split the audio into smaller segments",
+                "Use a lower quality encoding",
+            ],
+        )
+
+    # Validate file extension before saving
+    if file.filename:
+        from pathlib import Path
+        ext = Path(file.filename).suffix.lower()
+        if ext not in AudioProcessor.SUPPORTED_FORMATS:
+            raise FileValidationError(
+                message=f"Unsupported file format: {ext}",
+                details=f"The file extension {ext} is not supported",
+                filename=file.filename,
+                expected_formats=AudioProcessor.SUPPORTED_FORMATS_LIST,
+                suggestions=[
+                    f"Convert to a supported format: {', '.join(AudioProcessor.SUPPORTED_FORMATS_LIST)}",
+                    "Use ffmpeg to convert: ffmpeg -i input_file output.wav",
+                ],
+            )
+
     # Generate unique filename and save
-    unique_filename = FileHandler.generate_unique_filename(file.filename or "audio")
+    unique_filename = FileHandler.generate_unique_filename(file.filename or "audio.wav")
     file_path = await FileHandler.save_upload_file(
         file.file,
         unique_filename,
         settings.UPLOAD_DIR,
     )
 
-    # Validate audio file
-    is_valid, message = AudioProcessor.validate_audio_file(file_path)
-    if not is_valid:
-        # Cleanup file
+    # Validate audio file with detailed error reporting
+    try:
+        AudioProcessor.validate_audio_file_detailed(file_path)
+    except FileValidationError:
+        # Cleanup file and re-raise
         AudioProcessor.cleanup_file(file_path)
-        raise FileValidationError(message)
+        raise
 
     # Create transcription request
     try:

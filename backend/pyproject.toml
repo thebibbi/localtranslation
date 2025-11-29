@@ -1,3 +1,10 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
 [project]
 name = "speech-processing-backend"
 version = "0.1.0"
@@ -12,40 +19,42 @@ dependencies = [
     "websockets==12.0",
 
     # ML/AI - Core for MVP
-    "faster-whisper==1.0.0",
-    "torch==2.1.0",
-    "torchaudio==2.1.0",
+    "faster-whisper==1.0.3",
+    "torch==2.2.0",
+    "torchaudio==2.2.0",
 
     # Audio Processing
-    "librosa==0.10.1",
-    "soundfile==0.12.1",
+    "librosa==0.10.2",
+    "soundfile==0.13.1",
     "pydub==0.25.1",
+    "av>=12.0.0",
 
     # Utilities
-    "pydantic==2.5.0",
-    "pydantic-settings==2.1.0",
+    "pydantic==2.8.2",
+    "pydantic-settings==2.6.1",
     "python-dotenv==1.0.0",
     "aiofiles==23.2.1",
+    "numpy<2.0",
 
     # Storage
-    "sqlalchemy==2.0.23",
-    "alembic==1.13.0",
+    "sqlalchemy==2.0.36",
+    "alembic==1.14.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     # Testing
-    "pytest==7.4.3",
-    "pytest-asyncio==0.21.1",
-    "pytest-cov==4.1.0",
-    "httpx==0.25.2",
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "httpx==0.28.1",
 
     # Code Quality
-    "black==23.12.0",
-    "isort==5.13.0",
-    "pylint==3.0.3",
-    "mypy==1.7.1",
-    "flake8==6.1.0",
+    "black==24.10.0",
+    "isort==5.12.0",
+    "pylint==3.3.1",
+    "mypy==1.13.0",
+    "flake8==7.1.1",
 ]
 diarization = [
     "pyannote.audio==3.1.0",
@@ -78,3 +87,16 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
 addopts = "-v --cov=app --cov-report=html --cov-report=term"
+
+[dependency-groups]
+dev = [
+    "black==24.10.0",
+    "flake8==7.1.1",
+    "httpx==0.28.1",
+    "isort==5.12.0",
+    "mypy==1.13.0",
+    "pylint==3.3.1",
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+]

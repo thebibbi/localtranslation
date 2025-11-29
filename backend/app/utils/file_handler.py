@@ -2,7 +2,7 @@
 import os
 import uuid
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, Optional
 
 import aiofiles
 
@@ -11,6 +11,9 @@ from app.core.errors import FileValidationError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+# Allowed file extensions (lowercase, with dot)
+ALLOWED_EXTENSIONS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac", ".wma", ".mp4", ".mov"}
 
 
 class FileHandler:
@@ -50,25 +53,95 @@ class FileHandler:
         Raises:
             FileValidationError: If save fails
         """
+        file_path = None
         try:
             # Ensure directory exists
             Path(destination_dir).mkdir(parents=True, exist_ok=True)
 
             file_path = os.path.join(destination_dir, filename)
 
-            # Read and save file asynchronously
+            # Seek to beginning of file (in case it was already read)
+            if hasattr(file, 'seek'):
+                file.seek(0)
+
+            # Read content
+            content = file.read()
+
+            # Validate content was read
+            if not content:
+                raise FileValidationError(
+                    message="Empty file received",
+                    details="The uploaded file contains no data or the file stream was already consumed",
+                    filename=filename,
+                    suggestions=[
+                        "Ensure the file is not empty",
+                        "Try uploading the file again",
+                    ],
+                )
+
+            # Save file asynchronously
             async with aiofiles.open(file_path, "wb") as f:
-                content = file.read()
                 await f.write(content)
 
-            logger.info(f"Saved file to {file_path}")
+            # Verify file was written
+            saved_size = os.path.getsize(file_path)
+            if saved_size == 0:
+                raise FileValidationError(
+                    message="File save failed",
+                    details="File was saved but is empty",
+                    filename=filename,
+                    suggestions=["Try uploading the file again"],
+                )
+
+            logger.info(f"Saved file to {file_path} ({saved_size / 1024:.1f} KB)")
             return file_path
+
+        except FileValidationError:
+            # Clean up if we created a file
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
+            raise
+
+        except PermissionError as e:
+            logger.error(f"Permission denied saving file: {str(e)}")
+            raise FileValidationError(
+                message="Permission denied",
+                details=f"Cannot write to directory: {destination_dir}",
+                filename=filename,
+                suggestions=[
+                    "Check directory permissions",
+                    "Ensure the storage directory exists and is writable",
+                ],
+            )
+
+        except OSError as e:
+            logger.error(f"OS error saving file: {str(e)}")
+            raise FileValidationError(
+                message="Failed to save file",
+                details=str(e),
+                filename=filename,
+                suggestions=[
+                    "Check available disk space",
+                    "Verify the storage directory is accessible",
+                ],
+            )
 
         except Exception as e:
             logger.error(f"Failed to save file: {str(e)}")
+            # Clean up if we created a file
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except Exception:
+                    pass
             raise FileValidationError(
-                "Failed to save uploaded file",
+                message="Failed to save uploaded file",
                 details=str(e),
+                filename=filename,
+                suggestions=["Try uploading the file again"],
             )
 
     @staticmethod

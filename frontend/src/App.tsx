@@ -1,11 +1,11 @@
 /**
  * Main App Component
  */
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FileUploader } from "./components/FileUploader";
 import { TranscriptionView } from "./components/TranscriptionView";
 import { useTranscriptionStore } from "./stores/transcription";
-import { transcribeFile, pollJobStatus, checkHealth } from "./services/transcription";
+import { transcribeFile, transcribeFileFromPath, pollJobStatus, checkHealth } from "./services/transcription";
 import type { ModelSize } from "./types/api";
 
 interface TranscriptionOptions {
@@ -57,6 +57,52 @@ function App() {
 
       // Upload and start transcription
       const jobCreateResponse = await transcribeFile(file, {
+        language: options.language,
+        model_size: options.modelSize,
+        enable_diarization: options.enableDiarization,
+        num_speakers: options.numSpeakers,
+      });
+
+      console.log("Job created:", jobCreateResponse.job_id);
+
+      // Poll for job completion
+      const completedJob = await pollJobStatus(
+        jobCreateResponse.job_id,
+        (job) => {
+          console.log("Job progress:", job.progress, "%");
+          setCurrentJob(job);
+        }
+      );
+
+      console.log("Job completed:", completedJob);
+
+      // Update state with completed job
+      setCurrentJob(completedJob);
+      addToHistory(completedJob);
+      setIsProcessing(false);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "An unexpected error occurred";
+      console.error("Transcription error:", errorMessage);
+      setError(errorMessage);
+      setIsProcessing(false);
+    }
+  };
+
+  const handleFilePathSelect = async (
+    filePath: string,
+    fileName: string,
+    mimeType: string,
+    options: TranscriptionOptions
+  ) => {
+    try {
+      clearError();
+      setIsProcessing(true);
+
+      console.log("Transcribing file from path:", filePath, "with options:", options);
+
+      // Upload and start transcription using path-based method
+      const jobCreateResponse = await transcribeFileFromPath(filePath, fileName, mimeType, {
         language: options.language,
         model_size: options.modelSize,
         enable_diarization: options.enableDiarization,
@@ -205,6 +251,7 @@ function App() {
         {!currentJob || currentJob.status !== "completed" ? (
           <FileUploader
             onFileSelect={handleFileSelect}
+            onFilePathSelect={handleFilePathSelect}
             isProcessing={isProcessing}
           />
         ) : (

@@ -1,5 +1,6 @@
 """Custom exception classes for the application."""
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 class SpeechProcessingException(Exception):
@@ -32,6 +33,7 @@ class SpeechProcessingException(Exception):
         error_dict: Dict[str, Any] = {
             "code": self.code,
             "message": self.message,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
         }
         if self.details:
             error_dict["details"] = self.details
@@ -41,14 +43,33 @@ class SpeechProcessingException(Exception):
 class AudioProcessingError(SpeechProcessingException):
     """Audio file processing errors."""
 
-    def __init__(self, message: str, details: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        details: Optional[str] = None,
+        file_path: Optional[str] = None,
+        suggestions: Optional[List[str]] = None,
+    ) -> None:
         """Initialize audio processing error.
 
         Args:
             message: Error message
             details: Additional error details
+            file_path: Path to the problematic file
+            suggestions: List of suggestions to fix the issue
         """
         super().__init__(message, code="AUDIO_PROCESSING_ERROR", details=details)
+        self.file_path = file_path
+        self.suggestions = suggestions or []
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert exception to dictionary with audio-specific info."""
+        error_dict = super().to_dict()
+        if self.file_path:
+            error_dict["file_path"] = self.file_path
+        if self.suggestions:
+            error_dict["suggestions"] = self.suggestions
+        return error_dict
 
 
 class ModelLoadError(SpeechProcessingException):
@@ -106,14 +127,48 @@ class TranslationError(SpeechProcessingException):
 class FileValidationError(SpeechProcessingException):
     """File validation errors."""
 
-    def __init__(self, message: str, details: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        details: Optional[str] = None,
+        filename: Optional[str] = None,
+        expected_formats: Optional[List[str]] = None,
+        actual_format: Optional[str] = None,
+        file_size_mb: Optional[float] = None,
+        suggestions: Optional[List[str]] = None,
+    ) -> None:
         """Initialize file validation error.
 
         Args:
             message: Error message
             details: Additional error details
+            filename: Name of the problematic file
+            expected_formats: List of expected/supported formats
+            actual_format: Detected actual format
+            file_size_mb: File size in megabytes
+            suggestions: List of suggestions to fix the issue
         """
         super().__init__(message, code="FILE_VALIDATION_ERROR", details=details)
+        self.filename = filename
+        self.expected_formats = expected_formats
+        self.actual_format = actual_format
+        self.file_size_mb = file_size_mb
+        self.suggestions = suggestions or []
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert exception to dictionary with file-specific info."""
+        error_dict = super().to_dict()
+        if self.filename:
+            error_dict["filename"] = self.filename
+        if self.expected_formats:
+            error_dict["expected_formats"] = self.expected_formats
+        if self.actual_format:
+            error_dict["actual_format"] = self.actual_format
+        if self.file_size_mb is not None:
+            error_dict["file_size_mb"] = round(self.file_size_mb, 2)
+        if self.suggestions:
+            error_dict["suggestions"] = self.suggestions
+        return error_dict
 
 
 class JobNotFoundError(SpeechProcessingException):
